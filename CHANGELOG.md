@@ -8,7 +8,7 @@ Important: This change-log is focused on the widgets themselves, and not the ove
 ## [0.0.4]
 
 ### Fixed
-- Websocket connections to addon
+- Websocket connections to addon are now being proxied correctly
 
 
 ## [0.0.3]

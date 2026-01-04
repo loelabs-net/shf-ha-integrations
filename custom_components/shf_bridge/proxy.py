@@ -5,8 +5,9 @@
 """Proxy view for forwarding requests to the Smart Home Floorplan addon."""
 from __future__ import annotations
 
-from aiohttp import web, WSMsgType  # pylint: disable=import-error
+from aiohttp import web  # pylint: disable=import-error
 import aiohttp  # pylint: disable=import-error
+import asyncio
 import logging
 from typing import Any
 
@@ -41,7 +42,7 @@ async def _proxy_websocket(request: Any, path: str) -> web.WebSocketResponse:
         # Connect to upstream WebSocket
         async with session.ws_connect(upstream_url) as upstream_ws:
             # Forward messages bidirectionally
-            async def forward_to_upstream():
+            async def forward_to_upstream() -> None:
                 try:
                     async for msg in ws:
                         if msg.type == web.WSMsgType.TEXT:
@@ -53,10 +54,10 @@ async def _proxy_websocket(request: Any, path: str) -> web.WebSocketResponse:
                             break
                         elif msg.type == web.WSMsgType.CLOSE:
                             break
-                except Exception as e:
+                except (aiohttp.ClientError, asyncio.CancelledError, OSError, ConnectionError) as e:
                     _LOGGER.exception("Error forwarding to upstream: %s", e)
 
-            async def forward_to_client():
+            async def forward_to_client() -> None:
                 try:
                     async for msg in upstream_ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
@@ -68,17 +69,17 @@ async def _proxy_websocket(request: Any, path: str) -> web.WebSocketResponse:
                             break
                         elif msg.type == aiohttp.WSMsgType.CLOSE:
                             break
-                except Exception as e:
+                except (aiohttp.ClientError, asyncio.CancelledError, OSError, ConnectionError) as e:
                     _LOGGER.exception("Error forwarding to client: %s", e)
 
             # Run both forwarding tasks concurrently
-            import asyncio
             await asyncio.gather(
                 forward_to_upstream(),
                 forward_to_client(),
                 return_exceptions=True
             )
-    except Exception as e:  # pylint: disable=broad-exception-caught
+    except (aiohttp.ClientError, OSError, ConnectionError) as e:
+        # Catching network-related exceptions for WebSocket connection errors
         _LOGGER.exception("Error proxying WebSocket to %s: %s", upstream_url, e)
         await ws.close()
 
@@ -152,9 +153,8 @@ async def _proxy_request(request: Any, path: str) -> web.Response:
                 headers=response_headers,
                 body=data,
             )
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        # Catching broad exception is acceptable here as we want to handle
-        # any network or request errors and return a proper error response
+    except (aiohttp.ClientError, OSError, ConnectionError, TimeoutError) as e:
+        # Catching network-related exceptions for HTTP request errors
         _LOGGER.exception("Error proxying request to %s: %s", upstream_url, e)
         return web.Response(status=500, text=f"Proxy error: {str(e)}")
 
