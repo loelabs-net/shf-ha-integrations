@@ -5,7 +5,8 @@
 """Proxy view for forwarding requests to the Smart Home Floorplan addon."""
 from __future__ import annotations
 
-from aiohttp import web  # pylint: disable=import-error
+from aiohttp import web, WSMsgType  # pylint: disable=import-error
+import aiohttp  # pylint: disable=import-error
 import logging
 from typing import Any
 
@@ -16,6 +17,72 @@ from .addon import get_addon_base_url
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def _proxy_websocket(request: Any, path: str) -> web.WebSocketResponse:
+    """Proxy WebSocket connections to upstream addon."""
+    _LOGGER.debug("PROXY WEBSOCKET: %s", request)
+
+    hass = request.app["hass"]
+    # Get the aiohttp client session from Home Assistant helpers
+    session = aiohttp_client.async_get_clientsession(hass)
+
+    # Get the addon base URL dynamically (cached for 15 seconds)
+    upstream_base = await get_addon_base_url(hass)
+    # Convert http:// to ws:// or https:// to wss://
+    upstream_ws_base = upstream_base.replace("http://", "ws://").replace("https://", "wss://")
+    upstream_url = f"{upstream_ws_base}/{path}"
+
+    # Create WebSocket response
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+
+    try:
+        # Connect to upstream WebSocket
+        async with session.ws_connect(upstream_url) as upstream_ws:
+            # Forward messages bidirectionally
+            async def forward_to_upstream():
+                try:
+                    async for msg in ws:
+                        if msg.type == web.WSMsgType.TEXT:
+                            await upstream_ws.send_str(msg.data)
+                        elif msg.type == web.WSMsgType.BINARY:
+                            await upstream_ws.send_bytes(msg.data)
+                        elif msg.type == web.WSMsgType.ERROR:
+                            _LOGGER.error("WebSocket error from client: %s", ws.exception())
+                            break
+                        elif msg.type == web.WSMsgType.CLOSE:
+                            break
+                except Exception as e:
+                    _LOGGER.exception("Error forwarding to upstream: %s", e)
+
+            async def forward_to_client():
+                try:
+                    async for msg in upstream_ws:
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            await ws.send_str(msg.data)
+                        elif msg.type == aiohttp.WSMsgType.BINARY:
+                            await ws.send_bytes(msg.data)
+                        elif msg.type == aiohttp.WSMsgType.ERROR:
+                            _LOGGER.error("WebSocket error from upstream: %s", upstream_ws.exception())
+                            break
+                        elif msg.type == aiohttp.WSMsgType.CLOSE:
+                            break
+                except Exception as e:
+                    _LOGGER.exception("Error forwarding to client: %s", e)
+
+            # Run both forwarding tasks concurrently
+            import asyncio
+            await asyncio.gather(
+                forward_to_upstream(),
+                forward_to_client(),
+                return_exceptions=True
+            )
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        _LOGGER.exception("Error proxying WebSocket to %s: %s", upstream_url, e)
+        await ws.close()
+
+    return ws
 
 
 async def _proxy_request(request: Any, path: str) -> web.Response:
@@ -100,8 +167,11 @@ class ShfBridgeProxy(HomeAssistantView):  # type: ignore[misc]
     requires_auth = True  # any logged-in HA user
     csrf_exempt = True
 
-    async def get(self, request: Any, path: str) -> web.Response:
-        """Handle GET requests."""
+    async def get(self, request: Any, path: str) -> web.Response | web.WebSocketResponse:
+        """Handle GET requests and WebSocket upgrades."""
+        # Check if this is a WebSocket upgrade request
+        if request.headers.get("Upgrade", "").lower() == "websocket":
+            return await _proxy_websocket(request, path)
         return await _proxy_request(request, path)
 
     async def post(self, request: Any, path: str) -> web.Response:
@@ -131,4 +201,8 @@ class ShfBridgeStaticProxy(HomeAssistantView):  # type: ignore[misc]
 
     async def get(self, request: Any, path: str) -> web.Response:
         """Handle GET requests for static assets."""
+
+        # LATER: Only have the websocket upgrade in the /api/ paths.. 
+        if request.headers.get("Upgrade", "").lower() == "websocket":
+            return await _proxy_websocket(request, path)
         return await _proxy_request(request, path)
