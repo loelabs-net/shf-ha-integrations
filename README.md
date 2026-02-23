@@ -66,7 +66,7 @@ This integration is typically installed alongside the [frontend card](https://gi
 ### Manual Installation
 
 1. Download the latest release from the [releases page](https://github.com/loelabs-net/shf-ha-integrations/releases)
-2. Copy the `custom_components/shf_bridge` folder into your Home Assistant `config/custom_components/` directory
+2. Copy the `custom_components/shf` folder into your Home Assistant `config/custom_components/` directory
 3. Restart Home Assistant
 4. Add the integration via **Settings** → **Devices & Services**
 

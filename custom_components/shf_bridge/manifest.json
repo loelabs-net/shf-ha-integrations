@@ -1,5 +1,5 @@
 {
-  "domain": "shf_bridge",
+  "domain": "shf",
   "name": "Smart Home Floorplan",
   "codeowners": ["@loelabs"],
   "config_flow": true,

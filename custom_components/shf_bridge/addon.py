@@ -31,9 +31,9 @@ _cache: dict[str, tuple[str, datetime]] = {}
 
 def _get_channel() -> str:
     """Get the current channel based on the DOMAIN."""
-    if DOMAIN == "shf_bridge_local":
+    if DOMAIN == "shf_local":
         return "local"
-    # Default to "pub" for "shf_bridge" or any other domain
+    # Default to "pub" for "shf" or any other domain
     return "pub"
 
 

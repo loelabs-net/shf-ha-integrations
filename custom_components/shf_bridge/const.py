@@ -3,7 +3,7 @@
 # Proprietary and confidential
 # ~
 """Constants for the Smart Home Floorplan Bridge integration."""
-DOMAIN = "shf_bridge"
+DOMAIN = "shf"
 CONF_CACHE_SECONDS = "cache_seconds"
 DEFAULT_CACHE_SECONDS = 60
 
