@@ -5,6 +5,12 @@ All notable changes to the Smart Home Floorplan integrations will be documented 
 Important: This change-log is focused on the widgets themselves, and not the overall Smart Home Floorplan product.
 
 
+## [next]
+
+### Changed
+- Integration brand images (icon/logo) are now shipped in the integration `brand/` folder for Home Assistant 2026.3+ local brand support, instead of relying on external hosting.
+
+
 ## [0.0.4]
 
 ### Fixed
