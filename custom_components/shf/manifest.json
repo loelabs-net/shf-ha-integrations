@@ -1,11 +1,15 @@
 {
   "domain": "shf",
   "name": "Smart Home Floorplan",
-  "codeowners": ["@loelabs"],
+  "codeowners": [
+    "@loelabs"
+  ],
   "config_flow": true,
-  "dependencies": ["http"],
+  "dependencies": [
+    "http"
+  ],
   "documentation": "https://github.com/loelabs-net/shf-ha-frontend",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/loelabs-net/shf-ha-integrations/issues",
-  "version": "0.0.4"
+  "version": "0.0.5"
 }
